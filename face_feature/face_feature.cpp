@@ -42,6 +42,8 @@ int main(int argc, char** argv)
 	int pts_num = 5;
 	int im_width = img_grayscale->width;
 	int im_height = img_grayscale->height;
+	printf("Input: %ux%u\n", im_width, im_height);
+
 	unsigned char* data = new unsigned char[im_width * im_height];
 	unsigned char* data_ptr = data;
 	unsigned char* image_data_ptr = (unsigned char*)img_grayscale->imageData;
