@@ -18,7 +18,79 @@ using namespace seeta;
 #define EXPECT_NE(a, b) if ((a) == (b)) std::cout << "ERROR: "
 #define EXPECT_EQ(a, b) if ((a) != (b)) std::cout << "ERROR: "
 
+bool build_face_feature(std::string &filename, std::vector<float> &feature_desc);
+uint64_t short_descriptor(const std::vector<float> &feature_desc);
+
 int main(int argc, char** argv)
+{
+	std::string face_name = "x5111zsv3vyi";
+
+	if (argc >= 2) {
+		face_name = std::string(argv[1]);
+	}
+
+	std::string image_filename = "image/" + face_name + ".bmp";
+	std::vector<float> feature_desc;
+
+	if (build_face_feature(image_filename, feature_desc)) {
+		//short_descriptor(feature_desc);
+		std::string feature_filename = "MATLAB/desc/" + face_name + ".desc";
+		
+		FILE* feat_file = NULL;
+		feat_file = fopen(feature_filename.c_str(), "wb");
+
+		if (feat_file)
+		{
+			fwrite(&feature_desc[0], sizeof(float), feature_desc.size(), feat_file);
+			fclose(feat_file);
+		}
+	}
+	return 0;
+}
+
+uint64_t short_descriptor(const std::vector<float> &feature_desc)
+{
+	const int64_t len = static_cast<int64_t>(feature_desc.size());
+	uint64_t prev_index = 0;
+	std::vector<uint8_t> bit_field(len >> 3);
+	uint64_t desc = 0;
+	uint32_t byte_index = 0;
+	uint32_t bit_index = 0;
+	uint8_t mask = 0;
+
+	for (size_t b = 0; b < len; ++b)
+	{
+		prev_index = b - 1;
+		prev_index %= len;
+
+		byte_index = b >> 3;
+		bit_index = b % 8;
+		mask = static_cast<uint8_t>(feature_desc[b] > feature_desc[prev_index]);
+
+		bit_field[byte_index] |= (1 << bit_index) * mask;
+	}
+
+	uint32_t* p_bit_field = reinterpret_cast<uint32_t*>(&bit_field[0]);
+	uint32_t one_count = 0;
+	uint64_t mask64 = 0;
+
+	for (uint32_t b = 0; b < 64; ++b)
+	{
+		one_count = 0;
+
+		for (uint32_t i = 0; i < 32; ++i)
+		{
+			one_count += ((p_bit_field[b] >> i) & 0x1);
+		}
+
+		mask64 = static_cast<uint64_t>(one_count >= 10);
+		desc |= ((1ULL << b) * mask64);
+	}
+
+	return desc;
+}
+
+bool build_face_feature(std::string &filename, std::vector<float> &feature_desc)
 {
 	// Initialize face detection model
 	seeta::FaceDetection detector("model/seeta_fd_frontal_v1.0.bin");
@@ -28,14 +100,14 @@ int main(int argc, char** argv)
 	detector.SetWindowStep(4, 4);
 	// Initialize face alignment model 
 	seeta::FaceAlignment point_detector("model/seeta_fa_v1.1.bin");
-	const char* image_filename = "image/x5111zsv3vyi.bmp";
-
+	const char* image_filename = filename.c_str();
 	//load image
 	IplImage *img_grayscale = NULL;
 	img_grayscale = cvLoadImage(image_filename, 0);
-	if (img_grayscale == NULL)
+
+	if (!img_grayscale)
 	{
-		return 0;
+		return false;
 	}
 
 	IplImage *img_color = cvLoadImage(image_filename, 1);
@@ -113,23 +185,9 @@ int main(int argc, char** argv)
 	face_recognizer.CropFace(src_img_data, points, dst_img_data);
 	cv::imwrite("image/crop.jpg", dst_img);
 	/* Extract feature */
-	std::vector<float> feature_desc(2048);
-	face_recognizer.ExtractFeature(dst_img_data,&feature_desc[0]);
 	
-	std::string feature_filename = "feature.desc";
-
-	if (argc >= 2) {
-		feature_filename = std::string(argv[1]);
-	}
-
-	FILE* feat_file = NULL;
-	feat_file = fopen(feature_filename.c_str(),"wb");
-
-	if (feat_file)
-	{
-		fwrite(&feature_desc[0], sizeof(float), feature_desc.size(), feat_file);
-		fclose(feat_file);
-	}
-	return 0;
+	feature_desc.clear();
+	feature_desc.resize(2048);
+	face_recognizer.ExtractFeature(dst_img_data, &feature_desc[0]);
+	return true;
 }
-
