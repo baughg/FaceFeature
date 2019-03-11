@@ -23,7 +23,7 @@ uint64_t short_descriptor(const std::vector<float> &feature_desc);
 
 int main(int argc, char** argv)
 {
-	std::string face_name = "x5111zsv3vyi";
+	std::string face_name = "ndiowxgnjox7";
 
 	if (argc >= 2) {
 		face_name = std::string(argv[1]);
